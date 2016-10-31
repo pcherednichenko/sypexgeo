@@ -20,7 +20,7 @@ class GeoTwo {
 
     public function ipSort() {
         $alreadySort = false;
-        $ipUniq = @fopen("RussianIpUniq.txt", "r");
+        $ipUniq = @fopen("RussianIpTest.txt", "r");
         if ($ipUniq) {
             echo ("Найден файл уникальных IP - буду использовать его\n");
             $handle = $ipUniq;
@@ -30,7 +30,7 @@ class GeoTwo {
         }
         if ($handle) {
             while (($buffer = fgets($handle, 4096)) !== false) {
-                $this->ip[] = substr($buffer, 0, -1);
+                $this->ip[] = str_replace(["\n","\r"], '', $buffer);
             }
             if (!feof($handle)) {
                 echo "Error: unexpected fgets() fail\n";
@@ -41,7 +41,6 @@ class GeoTwo {
         if (!$alreadySort) {
             $this->ip = array_unique($this->ip);
         }
-        file_put_contents("RussianIpUniq.txt", implode("\n", $this->ip));
         print_r(PHP_EOL . "уникальных элементов: " . count($this->ip) . PHP_EOL);
     }
 
@@ -63,18 +62,18 @@ class GeoTwo {
      * @return mixed
      */
     public function getPost(array $ip) {
-        $headerOptions = [
-            'http' => [
-                'method' => "GET",
-                'header' => "",
-            ],
-        ];
         $ipString = implode(",", $ip);
         if (empty($ipString)) {
             return null;
         }
-        $streamContext = stream_context_create($headerOptions);
-        $json = file_get_contents("http://api.sypexgeo.net/json/" . $ipString, false, $streamContext);
+        $ch = curl_init();
+        $url = "http://api.sypexgeo.net/json/" . $ipString;
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);   // возвращает веб-страницу
+        curl_setopt($ch, CURLOPT_HEADER, 0);           // не возвращает заголовки
+        curl_setopt($ch, CURLOPT_TIMEOUT, 120);        // таймаут ответа
+        $json = curl_exec($ch);
+        curl_close($ch);
         return $json;
     }
 
@@ -100,11 +99,15 @@ class GeoTwo {
                 }
             }
             $result = $this->getPost($ipList);
+            if ($result == null) {
+                continue;
+            }
             $decode = json_decode($result, true, 5);
             // если придет только один элемент- то завернем его в массив, как будто пришло много
             if (isset($decode['ip'])) {
                 $decode = [$decode];
             }
+
             foreach ($decode as $item) {
                 if ($item['city'] === null) {
                     if (isset($item['error'])) {
