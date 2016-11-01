@@ -8,6 +8,8 @@
  */
 class GeoTwo {
 
+    const KEY = ''; //здесь ваш ключ sypexgeo
+
     const INT = 0;
 
     const STR = 1;
@@ -18,15 +20,28 @@ class GeoTwo {
 
     private $groupIp = [];
 
+    private $fileNameUniq = '';
+
+    private $fileName = '';
+
+    public $needTest = false;
+
     public function ipSort() {
+        if ($this->needTest) {
+            $this->fileName = 'RussianIpTest.txt';
+            $this->fileNameUniq = 'RussianIpTestUniq.txt';
+        } else {
+            $this->fileName = 'RussianIp.txt';
+            $this->fileNameUniq = 'RussianIpUniq.txt';
+        }
         $alreadySort = false;
-        $ipUniq = @fopen("RussianIpTest.txt", "r");
+        $ipUniq = @fopen($this->fileNameUniq, "r");
         if ($ipUniq) {
             echo ("Найден файл уникальных IP - буду использовать его\n");
             $handle = $ipUniq;
             $alreadySort = true;
         } else {
-            $handle = @fopen("RussianIp.txt", "r");
+            $handle = @fopen($this->fileName, "r");
         }
         if ($handle) {
             while (($buffer = fgets($handle, 4096)) !== false) {
@@ -40,11 +55,12 @@ class GeoTwo {
         print_r(PHP_EOL . "всего элементов: " . count($this->ip));
         if (!$alreadySort) {
             $this->ip = array_unique($this->ip);
+            file_put_contents($this->fileNameUniq, implode("\n", $this->ip));
         }
         print_r(PHP_EOL . "уникальных элементов: " . count($this->ip) . PHP_EOL);
     }
 
-    public function groupHundredElements() {
+    private function groupHundredElements() {
         $t = 0;
         $group = 0;
         foreach ($this->ip as $item) {
@@ -67,17 +83,24 @@ class GeoTwo {
             return null;
         }
         $ch = curl_init();
-        $url = "http://api.sypexgeo.net/json/" . $ipString;
+        if ($this->needTest) {
+            echo("Тестовый запуск \n");
+            $url = "http://api.sypexgeo.net/json/" . $ipString;
+        } else {
+            echo("Запуск по ключу \n");
+            $url = "http://api.sypexgeo.net/" . self::KEY . "/json/" . $ipString;
+        }
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);   // возвращает веб-страницу
         curl_setopt($ch, CURLOPT_HEADER, 0);           // не возвращает заголовки
-        curl_setopt($ch, CURLOPT_TIMEOUT, 120);        // таймаут ответа
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);        // таймаут ответа
         $json = curl_exec($ch);
         curl_close($ch);
         return $json;
     }
 
     public function writeInBd($from = null) {
+        $this->groupHundredElements();
         $k = 0;
         $excluding = [];
         if ($from !== null) {
@@ -109,11 +132,13 @@ class GeoTwo {
             }
 
             foreach ($decode as $item) {
-                if ($item['city'] === null) {
-                    if (isset($item['error'])) {
+                if ($item['city'] === null && $item['country'] === null) {
+                    if (!empty($item['error'])) {
                         echo("Ошибка: " . $item['error'] . "\n");
+                    } else {
+                        echo("Нет информации по ip: " . $item['ip'] . "\n");
                     }
-                    break 2;
+                    continue;
                 }
                 $values = [
                     'ip'                 => $this->convert($item['ip'], self::STR),
