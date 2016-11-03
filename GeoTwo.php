@@ -37,7 +37,7 @@ class GeoTwo {
         $alreadySort = false;
         $ipUniq = @fopen($this->fileNameUniq, "r");
         if ($ipUniq) {
-            echo ("Найден файл уникальных IP - буду использовать его\n");
+            echo("Найден файл уникальных IP - буду использовать его\n");
             $handle = $ipUniq;
             $alreadySort = true;
         } else {
@@ -45,7 +45,7 @@ class GeoTwo {
         }
         if ($handle) {
             while (($buffer = fgets($handle, 4096)) !== false) {
-                $this->ip[] = str_replace(["\n","\r"], '', $buffer);
+                $this->ip[] = str_replace(["\n", "\r",], '', $buffer);
             }
             if (!feof($handle)) {
                 echo "Error: unexpected fgets() fail\n";
@@ -87,13 +87,12 @@ class GeoTwo {
             echo("Тестовый запуск \n");
             $url = "http://api.sypexgeo.net/json/" . $ipString;
         } else {
-            echo("Запуск по ключу \n");
             $url = "http://api.sypexgeo.net/" . self::KEY . "/json/" . $ipString;
         }
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);   // возвращает веб-страницу
         curl_setopt($ch, CURLOPT_HEADER, 0);           // не возвращает заголовки
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);        // таймаут ответа
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);         // таймаут ответа
         $json = curl_exec($ch);
         curl_close($ch);
         return $json;
@@ -113,7 +112,9 @@ class GeoTwo {
                 $excluding[] = $count;
             }
         }
-        echo("Не будут записаны группы: " . implode(", ", $excluding) . "\n");
+        if (isset($excluding)) {
+            echo("Не будут записаны группы: " . implode(", ", $excluding) . "\n");
+        }
         echo("\n ___Запись начата____ \n");
         foreach ($this->groupIp as $count => $ipList) {
             if (isset($excluding)) {
@@ -135,6 +136,8 @@ class GeoTwo {
                 if ($item['city'] === null && $item['country'] === null) {
                     if (!empty($item['error'])) {
                         echo("Ошибка: " . $item['error'] . "\n");
+                        var_dump($item);
+                        return null;
                     } else {
                         echo("Нет информации по ip: " . $item['ip'] . "\n");
                     }
@@ -199,7 +202,10 @@ class GeoTwo {
                 if (mysqli_query($this->db, $query)) {
                     $k++;
                 } else {
-                    echo "Error: " . $query . "\n" . mysqli_error($this->db);
+                    $error = mysqli_error($this->db);
+                    echo "Error: " . $query . "\n" . $error;
+                    var_dump($error);
+                    return null;
                 }
             };
             echo("Обработана группа: " . $count . "\n");
